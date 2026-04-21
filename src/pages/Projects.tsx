@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { getProjects } from '../data/portfolioData';
+import React, { useState, useEffect } from 'react';
+import { getProjects, type Project } from '../data/portfolioData';
 import ProjectCard from '../components/ProjectCard';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -7,11 +7,27 @@ const Categories = ['All', 'Web', 'Cloud', 'Mobile', 'AI/ML', 'Other'] as const;
 
 const Projects: React.FC = () => {
   const [activeTab, setActiveTab] = useState<typeof Categories[number]>('All');
-  const allProjects = getProjects();
+  const [allProjects, setAllProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    getProjects().then(data => {
+      setAllProjects(data);
+      setLoading(false);
+    });
+  }, []);
   
   const filteredProjects = activeTab === 'All' 
     ? allProjects 
     : allProjects.filter(p => p.category === activeTab);
+
+  if (loading) {
+    return (
+      <div className="container mx-auto px-6 lg:px-12 py-32 flex justify-center items-center">
+        <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto px-6 lg:px-12 py-12">

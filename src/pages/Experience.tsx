@@ -1,10 +1,26 @@
-import React from 'react';
-import { getExperiences } from '../data/portfolioData';
+import React, { useState, useEffect } from 'react';
+import { getExperiences, type Experience as ExperienceData } from '../data/portfolioData';
 import { motion } from 'framer-motion';
 import { Briefcase, GraduationCap } from 'lucide-react';
 
 const Experience: React.FC = () => {
-  const experiences = getExperiences();
+  const [experiences, setExperiences] = useState<ExperienceData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getExperiences().then(data => {
+      setExperiences(data);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-32 pb-24 flex justify-center items-center">
+        <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen pt-32 pb-24 overflow-hidden">

@@ -1,10 +1,27 @@
-import React from 'react';
-import { getCertifications } from '../data/portfolioData';
+import React, { useState, useEffect } from 'react';
+import { getCertifications, type Certification } from '../data/portfolioData';
 import { motion } from 'framer-motion';
 import { Award, ShieldCheck, ExternalLink, Calendar, Building2 } from 'lucide-react';
 
 const Certifications: React.FC = () => {
-  const certs = getCertifications();
+  const [certs, setCerts] = useState<Certification[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    getCertifications().then(data => {
+      setCerts(data);
+      setLoading(false);
+    });
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-32 pb-24 flex justify-center items-center">
+        <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
+
   const issuers = [...new Set(certs.map(c => c.issuer))];
 
   return (

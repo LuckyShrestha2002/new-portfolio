@@ -1,13 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Lock, Save, Trash2, Plus, LogOut, Layout, Briefcase, Award, Pencil, X, ChevronUp, ChevronDown } from 'lucide-react';
+import { Lock, Save, Trash2, Plus, LogOut, Layout, Briefcase, Award, Pencil, X, ChevronUp, ChevronDown, Loader2 } from 'lucide-react';
 import type { Project, Experience, Certification } from '../data/portfolioData';
-import { getProjects, getExperiences, getCertifications, saveLocalData } from '../data/portfolioData';
-
-const ADMIN_PASSWORD = 'admin123';
+import { 
+  getProjects, getExperiences, getCertifications,
+  saveProject, saveExperience, saveCertification,
+  deleteProject, deleteExperience, deleteCertification,
+  updateProjectsOrder, updateExperienceOrder, updateCertificationsOrder
+} from '../data/portfolioData';
+import { auth } from '../firebase';
+import { signInWithEmailAndPassword, signOut as firebaseSignOut, onAuthStateChanged } from 'firebase/auth';
 
 const Admin: React.FC = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'projects' | 'experience' | 'certs'>('projects');
@@ -16,39 +23,62 @@ const Admin: React.FC = () => {
   const [experience, setExperience] = useState<Experience[]>([]);
   const [certs, setCerts] = useState<Certification[]>([]);
 
+  const [isLoading, setIsLoading] = useState(false);
+
   // Form State
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<any>({});
 
   useEffect(() => {
-    if (sessionStorage.getItem('portfolio_admin_auth')) {
-      setIsAuthenticated(true);
-      loadData();
-    }
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsAuthenticated(true);
+        loadData();
+      } else {
+        setIsAuthenticated(false);
+      }
+      setIsAuthLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
-  const loadData = () => {
-    setProjects(getProjects());
-    setExperience(getExperiences());
-    setCerts(getCertifications());
-  };
-
-  const handleLogin = () => {
-    if (password === ADMIN_PASSWORD) {
-      setIsAuthenticated(true);
-      sessionStorage.setItem('portfolio_admin_auth', 'true');
-      setPassword(''); // Clear password after login
-      loadData();
-    } else {
-      setError('Incorrect password');
-      setPassword('');
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [p, e, c] = await Promise.all([
+        getProjects(),
+        getExperiences(),
+        getCertifications()
+      ]);
+      setProjects(p);
+      setExperience(e);
+      setCerts(c);
+    } catch (err) {
+      console.error("Failed to load data", err);
     }
+    setIsLoading(false);
   };
 
-  const handleLogout = () => {
-    sessionStorage.removeItem('portfolio_admin_auth');
-    setIsAuthenticated(false);
+  const handleLogin = async () => {
+    setIsAuthLoading(true);
+    setError('');
+    try {
+      await signInWithEmailAndPassword(auth, email, password);
+      // Let onAuthStateChanged handle the success state
+    } catch (err: any) {
+      setError(err.message || 'Incorrect email or password');
+    }
+    setIsAuthLoading(false);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await firebaseSignOut(auth);
+    } catch (err) {
+      console.error("Logout failed", err);
+    }
   };
 
   const resetForm = () => {
@@ -71,91 +101,108 @@ const Admin: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  const handleSaveItem = (e: React.FormEvent) => {
+  const handleSaveItem = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     const id = editingId || Date.now().toString();
     
-    if (activeTab === 'projects') {
-      const updatedItem: Project = {
-        ...formData,
-        id,
-        featured: !!formData.featured,
-        techStack: typeof formData.techStack === 'string' 
-          ? formData.techStack.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '') 
-          : (formData.techStack || []),
-        category: formData.category || 'Other'
-      };
-      
-      const updatedList = editingId 
-        ? projects.map(p => p.id === editingId ? updatedItem : p)
-        : [updatedItem, ...projects];
+    try {
+      if (activeTab === 'projects') {
+        const orderIdx = editingId ? formData.orderIdx : projects.length;
+        const updatedItem: Project = {
+          ...formData,
+          id,
+          orderIdx,
+          featured: !!formData.featured,
+          techStack: typeof formData.techStack === 'string' 
+            ? formData.techStack.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '') 
+            : (formData.techStack || []),
+          category: formData.category || 'Other'
+        };
         
-      setProjects(updatedList);
-      saveLocalData('portfolio_projects', updatedList);
-    } else if (activeTab === 'experience') {
-      const updatedItem: Experience = {
-        ...formData,
-        id,
-        skills: typeof formData.skills === 'string'
-          ? formData.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '')
-          : (formData.skills || []),
-        type: formData.type || 'Other'
-      };
-      
-      const updatedList = editingId
-        ? experience.map(e => e.id === editingId ? updatedItem : e)
-        : [updatedItem, ...experience];
+        await saveProject(updatedItem);
+        const updatedList = editingId 
+          ? projects.map(p => p.id === editingId ? updatedItem : p)
+          : [...projects, updatedItem];
+          
+        setProjects(updatedList.sort((a,b) => (a.orderIdx || 0) - (b.orderIdx || 0)));
+      } else if (activeTab === 'experience') {
+        const orderIdx = editingId ? formData.orderIdx : experience.length;
+        const updatedItem: Experience = {
+          ...formData,
+          id,
+          orderIdx,
+          skills: typeof formData.skills === 'string'
+            ? formData.skills.split(',').map((s: string) => s.trim()).filter((s: string) => s !== '')
+            : (formData.skills || []),
+          type: formData.type || 'Other'
+        };
         
-      setExperience(updatedList);
-      saveLocalData('portfolio_experience', updatedList);
-    } else {
-      const updatedItem: Certification = { ...formData, id };
-      const updatedList = editingId
-        ? certs.map(c => c.id === editingId ? updatedItem : c)
-        : [updatedItem, ...certs];
+        await saveExperience(updatedItem);
+        const updatedList = editingId
+          ? experience.map(e => e.id === editingId ? updatedItem : e)
+          : [...experience, updatedItem];
+          
+        setExperience(updatedList.sort((a,b) => (a.orderIdx || 0) - (b.orderIdx || 0)));
+      } else {
+        const orderIdx = editingId ? formData.orderIdx : certs.length;
+        const updatedItem: Certification = { ...formData, id, orderIdx };
+        await saveCertification(updatedItem);
         
-      setCerts(updatedList);
-      saveLocalData('portfolio_certifications', updatedList);
+        const updatedList = editingId
+          ? certs.map(c => c.id === editingId ? updatedItem : c)
+          : [...certs, updatedItem];
+          
+        setCerts(updatedList.sort((a,b) => (a.orderIdx || 0) - (b.orderIdx || 0)));
+      }
+    } catch (err) {
+      console.error("Save error:", err);
+      alert("Failed to save item. Check console.");
     }
     
+    setIsLoading(false);
     resetForm();
   };
 
-  const deleteItem = (id: string, type: 'projects' | 'experience' | 'certs') => {
+  const deleteItem = async (id: string, type: 'projects' | 'experience' | 'certs') => {
     if (!confirm('Are you sure you want to delete this item?')) return;
+    setIsLoading(true);
     
-    if (type === 'projects') {
-      const updated = projects.filter(p => p.id !== id);
-      setProjects(updated);
-      saveLocalData('portfolio_projects', updated);
-    } else if (type === 'experience') {
-      const updated = experience.filter(e => e.id !== id);
-      setExperience(updated);
-      saveLocalData('portfolio_experience', updated);
-    } else {
-      const updated = certs.filter(c => c.id !== id);
-      setCerts(updated);
-      saveLocalData('portfolio_certifications', updated);
+    try {
+      if (type === 'projects') {
+        await deleteProject(id);
+        setProjects(projects.filter(p => p.id !== id));
+      } else if (type === 'experience') {
+        await deleteExperience(id);
+        setExperience(experience.filter(e => e.id !== id));
+      } else {
+        await deleteCertification(id);
+        setCerts(certs.filter(c => c.id !== id));
+      }
+    } catch (err) {
+      console.error("Failed to delete", err);
+      alert("Failed to delete. Check console.");
     }
+    setIsLoading(false);
   };
 
-  const moveItem = (index: number, direction: 'up' | 'down', type: 'projects' | 'experience' | 'certs') => {
+  const moveItem = async (index: number, direction: 'up' | 'down', type: 'projects' | 'experience' | 'certs') => {
     let list: any[];
     let setList: any;
-    let storageKey: string;
+    let updateOperation: (items: any[]) => Promise<void>;
 
     if (type === 'projects') {
       list = [...projects];
       setList = setProjects;
-      storageKey = 'portfolio_projects';
+      updateOperation = updateProjectsOrder;
     } else if (type === 'experience') {
       list = [...experience];
       setList = setExperience;
-      storageKey = 'portfolio_experience';
+      updateOperation = updateExperienceOrder;
     } else {
       list = [...certs];
       setList = setCerts;
-      storageKey = 'portfolio_certifications';
+      updateOperation = updateCertificationsOrder;
     }
 
     if (direction === 'up' && index > 0) {
@@ -166,9 +213,28 @@ const Admin: React.FC = () => {
       return;
     }
 
-    setList(list);
-    saveLocalData(storageKey, list);
+    // Re-assign order properties explicitly just in case
+    list.forEach((item, idx) => {
+      item.orderIdx = idx;
+    });
+
+    setList(list); // Optimistic UI update
+    
+    try {
+      await updateOperation(list);
+    } catch (err) {
+      console.error("Failed to reorder", err);
+      alert("Failed to reorder. The UI may revert on next reload.");
+    }
   };
+
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex justify-center items-center">
+        <div className="w-12 h-12 border-4 border-brand border-t-transparent rounded-full animate-spin"></div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return (
@@ -179,20 +245,28 @@ const Admin: React.FC = () => {
           </div>
           <div>
             <h1 className="text-2xl font-black tracking-tight">Admin Authentication</h1>
-            <p className="text-text-muted text-sm mt-2">Enter your password to manage portfolio content.</p>
+            <p className="text-text-muted text-sm mt-2">Sign in to manage portfolio content.</p>
           </div>
           <div className="space-y-4">
+            <input 
+              type="email" 
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="Admin Email"
+              className="w-full bg-bg border border-border focus:border-brand rounded-2xl p-4 outline-none transition-all placeholder:text-text-muted/50"
+            />
             <input 
               type="password" 
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              placeholder="Admin Password"
+              placeholder="Password"
               className="w-full bg-bg border border-border focus:border-brand rounded-2xl p-4 outline-none transition-all placeholder:text-text-muted/50"
             />
             {error && <p className="text-red-500 text-xs font-bold">{error}</p>}
             <button 
               onClick={handleLogin}
+              disabled={isAuthLoading}
               className="w-full py-4 bg-grad-primary text-white rounded-2xl font-black shadow-lg hover:shadow-glow transition-all"
             >
               Sign In →
@@ -210,7 +284,7 @@ const Admin: React.FC = () => {
           <h1 className="text-3xl font-black tracking-tighter flex items-center gap-3">
             Admin Dashboard <span className="bg-brand/10 text-brand text-[10px] px-2 py-1 rounded-full uppercase tracking-widest border border-brand/20">Authorized</span>
           </h1>
-          <p className="text-text-secondary mt-1">Manage your professional content and resume data.</p>
+          <p className="text-text-secondary mt-1">Manage your professional content and resume data in Firestore.</p>
         </div>
         <button 
           onClick={handleLogout}
@@ -242,8 +316,14 @@ const Admin: React.FC = () => {
         ))}
       </div>
 
+      {isLoading && (
+         <div className="w-full flex justify-center py-6">
+           <Loader2 className="animate-spin text-brand" size={32} />
+         </div>
+      )}
+
       {/* Main Content Area */}
-      <div className="glass-card mb-8">
+      <div className={`glass-card mb-8 ${isLoading ? 'opacity-50 pointer-events-none' : ''}`}>
         <div className="p-8 border-b border-border flex justify-between items-center">
             <h2 className="text-xl font-black capitalize tracking-tight flex items-center gap-2">
                 Manage {activeTab} 
@@ -382,7 +462,7 @@ const Admin: React.FC = () => {
 
                  <div className="flex justify-end gap-3 pt-4">
                    <button type="button" onClick={resetForm} className="px-6 py-2.5 rounded-xl font-bold text-text-muted hover:bg-bg-glass transition-all">Cancel</button>
-                   <button type="submit" className="flex items-center gap-2 bg-brand text-white px-8 py-2.5 rounded-xl font-bold shadow-lg shadow-brand/20 hover:scale-105 transition-all">
+                   <button type="submit" disabled={isLoading} className="flex items-center gap-2 bg-brand text-white px-8 py-2.5 rounded-xl font-bold shadow-lg shadow-brand/20 hover:scale-105 transition-all">
                      <Save size={18} /> {editingId ? 'Update' : 'Save'} {activeTab === 'certs' ? 'Certification' : activeTab.slice(0, -1)}
                    </button>
                  </div>
@@ -494,7 +574,7 @@ const Admin: React.FC = () => {
                    </div>
                  ))}
 
-                 {((activeTab === 'projects' && !projects.length) || 
+                 {!isLoading && ((activeTab === 'projects' && !projects.length) || 
                    (activeTab === 'experience' && !experience.length) || 
                    (activeTab === 'certs' && !certs.length)) && (
                    <div className="text-center py-16">
@@ -509,7 +589,7 @@ const Admin: React.FC = () => {
       </div>
       
       <div className="text-center text-text-muted text-[10px] font-bold mt-12 bg-bg-card/50 p-4 rounded-2xl border border-border uppercase tracking-widest">
-        🔐 Admin Data is persisted in Local Storage. Changes are reflected immediately across the site.
+        🚀 Admin Data is now persisted in Firebase Cloud Firestore. Changes are visible across devices and the live domain.
       </div>
     </div>
   );
