@@ -19,7 +19,7 @@ const Hero: React.FC = () => {
   ];
 
   return (
-    <section className="relative min-h-[92vh] flex items-center justify-center pt-24 pb-12 overflow-x-hidden">
+    <section className="relative min-h-[100dvh] lg:min-h-[92vh] flex items-start lg:items-center justify-center pt-32 lg:pt-24 pb-12 overflow-x-hidden">
       {/* Background Decor */}
       <div className="absolute top-0 left-0 w-full h-full -z-10 opacity-30 pointer-events-none">
         <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-brand/5 rounded-full blur-[120px]" />
@@ -37,7 +37,7 @@ const Hero: React.FC = () => {
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
             <div className="inline-flex items-center gap-2 px-4 py-2 glass-card mb-8 border-brand/20 bg-white/50">
-              <span className="text-brand font-bold text-sm sm:text-base whitespace-nowrap">
+              <span className="text-brand font-bold text-xs sm:text-base whitespace-normal sm:whitespace-nowrap">
                 👋 Hi, I'm Lucky Shrestha — NEC Certified Computer Engineer
               </span>
             </div>
