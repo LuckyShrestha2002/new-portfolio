@@ -42,8 +42,9 @@ const Navbar: React.FC = () => {
   ];
 
   return (
-    <nav 
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
+    <>
+      <nav 
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         isScrolled 
           ? 'bg-white/80 dark:bg-[#0b111e]/80 backdrop-blur-lg shadow-sm py-4' 
           : 'bg-transparent py-6'
@@ -103,9 +104,10 @@ const Navbar: React.FC = () => {
           </button>
         </div>
       </div>
+    </nav>
 
       {/* Mobile Menu Overlay */}
-      <div className={`fixed inset-0 pt-[100px] pb-12 bg-white dark:bg-[#0b111e] z-40 flex flex-col items-center gap-8 lg:hidden transition-all duration-300 ${
+      <div className={`fixed inset-0 min-h-[100dvh] w-full pt-[100px] pb-12 bg-white dark:bg-[#0b111e] z-40 flex flex-col items-center gap-8 lg:hidden transition-all duration-300 ${
         isOpen ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
       }`}>
         {navLinks.map((link) => (
@@ -123,7 +125,7 @@ const Navbar: React.FC = () => {
           Let's Talk
         </Link>
       </div>
-    </nav>
+    </>
   );
 };
 
