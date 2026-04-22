@@ -31,7 +31,7 @@ const Hero: React.FC = () => {
 
           {/* Left: Content */}
           <motion.div
-            className="flex-1 text-center lg:text-left"
+            className="flex-1 text-center lg:text-left order-2 lg:order-1"
             initial={{ opacity: 0, x: -30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.8, ease: "easeOut" }}
@@ -85,7 +85,7 @@ const Hero: React.FC = () => {
 
           {/* Right: Visual Card */}
           <motion.div
-            className="flex-1 flex flex-col items-center justify-center mt-12 lg:mt-0"
+            className="flex-1 flex flex-col items-center justify-center order-1 lg:order-2"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.2 }}
