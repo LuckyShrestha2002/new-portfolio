@@ -109,7 +109,7 @@
 }
 
 .hero-stats {
-  @apply flex items-center gap-10;
+  @apply flex items-center justify-center lg:justify-start gap-4 sm:gap-8 md:gap-10 w-full flex-wrap sm:flex-nowrap;
 }
 
 .stat-item {
@@ -117,11 +117,11 @@
 }
 
 .stat-value {
-  @apply text-3xl font-bold text-brand;
+  @apply text-2xl sm:text-3xl font-bold text-brand;
 }
 
 .stat-label {
-  @apply text-xs font-semibold uppercase tracking-widest text-[var(--text-muted)];
+  @apply text-[10px] sm:text-xs font-semibold uppercase tracking-wider sm:tracking-widest text-[var(--text-muted)];
 }
 
 @layer utilities {
